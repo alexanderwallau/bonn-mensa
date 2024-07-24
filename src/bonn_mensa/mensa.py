@@ -375,6 +375,7 @@ def query_mensa(
     colors: bool = True,
     markdown_output: bool = False,
     xml_output: bool = False,
+    xml_indent: bool = False,
 ) -> None:
     if date is None:
         # If no date is provided get next valid day i.E. working days from monday to fridy
@@ -509,6 +510,10 @@ def query_mensa(
         elif xml_output:
             xml_root = parser.to_xml(canteen)
             xml_tree = ET.ElementTree(xml_root)
+
+            if xml_indent:
+                ET.indent(xml_tree)
+
             cat_title = cat.title.replace("& ", "").replace(" ", "-")
 
             filename = f"{canteen}_{cat_title}_{date}_{time.time()}.xml"
@@ -648,6 +653,11 @@ def get_parser():
         action="store_true",
         help="Only show gluten free options",
     )
+    parser.add_argument(
+        "--indent-xml",
+        action="store_true",
+        help="Indent the generated XML files for better readability."
+    )
     return parser
 
 
@@ -673,6 +683,7 @@ def run_cmd(args):
         verbose=args.verbose,
         price=args.price,
         xml_output=args.xml,
+        xml_indent=args.indent_xml,
     )
 
 
