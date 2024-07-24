@@ -2,8 +2,10 @@
 
 import argparse
 import datetime
+import re
 import sys
 import time
+import unicodedata
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from typing import Dict, List, Optional, Set
@@ -143,6 +145,30 @@ output_strs = {
         "en": "Additives",
     },
 }
+
+
+def slugify(value, allow_unicode=False):
+    """
+    Taken from https://github.com/django/django/blob/master/django/utils/text.py
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize("NFKC", value)
+    else:
+        value = (
+            unicodedata.normalize("NFKD", value)
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")
+
+
+
 
 
 class Meal:
@@ -504,10 +530,9 @@ def query_mensa(
         if xml_indent:
             ET.indent(xml_tree)
 
-        filename = f"{canteen}_{date}_{time.time()}.xml"
-        xml_tree.write(
-            filename, encoding="utf-8", xml_declaration=True, method="xml"
-        )
+        filestem = slugify(f"{canteen}_{date}_{time.time()}")
+        filename = f"{filestem}.xml"
+        xml_tree.write(filename, encoding="utf-8", xml_declaration=True, method="xml")
         print(f"XML saved to {filename}")
 
     for cat in queried_categories:
