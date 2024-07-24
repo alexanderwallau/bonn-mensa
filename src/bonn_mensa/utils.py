@@ -220,28 +220,30 @@ class SimpleMensaResponseParser(HTMLParser):
         self.start_new_category()
 
 
-def from_xml(root: ET.Element) -> dict[str, tuple[list[Category], list[str]]]:
+def from_xml(root: ET.Element) -> dict[str, tuple[list[Category], dict]]:
     NSPS = {"": "http://openmensa.org/open-mensa-v2"}
     days = root.find("canteen", NSPS).findall("day", NSPS)
 
     date_dict = {}
 
     for day in days:
+        meta_dict = {}
+
         date = day.attrib["date"]
 
         meta_data_elem = day.find("meta_data", NSPS)
-        if meta_data_elem:
-            meta_data = meta_data_elem.text.split(";")
-        else:
-            meta_data = []
+
+        meta_dict["meta_data"] = (
+            meta_data_elem.text.split(";") if meta_data_elem else []
+        )
+        meta_dict["query_date"] = root.find("query_date", NSPS).text
 
         category_list = []
         for cat in day.findall("category", NSPS):
             curr_cat = Category(title=cat.attrib["name"])
             for meal in cat.findall("meal", NSPS):
                 current_meal = Meal(title=meal.find("name", NSPS).text)
-
-                for price_elem in meal.findall("price"):
+                for price_elem in meal.findall("price", NSPS):
                     role = price_elem.attrib["role"]
                     price = int(float(price_elem.text) * 100)
 
@@ -260,7 +262,7 @@ def from_xml(root: ET.Element) -> dict[str, tuple[list[Category], list[str]]]:
                 curr_cat.add_meal(current_meal)
             category_list.append(curr_cat)
 
-        date_dict[date] = category_list, meta_data
+        date_dict[date] = category_list, meta_dict
     return date_dict
 
 
@@ -293,14 +295,17 @@ def to_xml(
     version = ET.SubElement(root, "version")
     version.text = "5.04-4"
 
+    query_date_elem = ET.SubElement(root, "query_date")
+    query_date_elem.text = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     # Create the canteen and Date element
     canteen = ET.SubElement(root, "canteen")
     day = ET.SubElement(canteen, "day")
     day.set("date", date)
 
     if meta_data:
-        meta_data = ET.SubElement(day, "meta_data")
-        meta_data.text = ";".join(meta_data)
+        meta_data_elem = ET.SubElement(day, "meta_data")
+        meta_data_elem.text = ";".join(meta_data)
 
     # Create the meals element
 
