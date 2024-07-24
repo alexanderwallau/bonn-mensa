@@ -159,6 +159,9 @@ class Meal:
     def add_additive(self, additive: str) -> None:
         self.additives.append(additive)
 
+    def __repr__(self) -> str:
+        return f"Meal('{self.title}')"
+
 
 class Category:
     def __init__(self, title: str) -> None:
@@ -167,6 +170,9 @@ class Category:
 
     def add_meal(self, meal: Meal) -> None:
         self.meals.append(meal)
+
+    def __repr__(self) -> str:
+        return f"({self.title}: {self.meals})"
 
 
 class SimpleMensaResponseParser(HTMLParser):
