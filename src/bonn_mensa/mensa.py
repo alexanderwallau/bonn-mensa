@@ -549,7 +549,9 @@ def query_mensa(
         if xml_output:
             xml_root = parser.to_xml(canteen)
             xml_tree = ET.ElementTree(xml_root)
-            filename = f"{canteen}_{date}_{time.time()}.xml"
+            cat_title = cat.title.replace("& ", "").replace(" ", "-")
+
+            filename = f"{canteen}_{cat_title}_{date}_{time.time()}.xml"
             xml_tree.write(
                 filename, encoding="utf-8", xml_declaration=True, method="xml"
             )
