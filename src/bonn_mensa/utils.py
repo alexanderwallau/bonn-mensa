@@ -220,7 +220,53 @@ class SimpleMensaResponseParser(HTMLParser):
         self.start_new_category()
 
 
-def to_xml(categories: list[Category], meta_data: list[str], canteen_name: str) -> ET.Element:
+def from_xml(root: ET.Element) -> dict[str, tuple[list[Category], list[str]]]:
+    NSPS = {"": "http://openmensa.org/open-mensa-v2"}
+    days = root.find("canteen", NSPS).findall("day", NSPS)
+
+    date_dict = {}
+
+    for day in days:
+        date = day.attrib["date"]
+
+        meta_data_elem = day.find("meta_data", NSPS)
+        if meta_data_elem:
+            meta_data = meta_data_elem.text.split(";")
+        else:
+            meta_data = []
+
+        category_list = []
+        for cat in day.findall("category", NSPS):
+            curr_cat = Category(title=cat.attrib["name"])
+            for meal in cat.findall("meal", NSPS):
+                current_meal = Meal(title=meal.find("name", NSPS).text)
+
+                for price_elem in meal.findall("price"):
+                    role = price_elem.attrib["role"]
+                    price = int(float(price_elem.text) * 100)
+
+                    match role:
+                        case "student":
+                            current_meal.student_price = price
+                        case "employee":
+                            current_meal.staff_price = price
+                        case "other":
+                            current_meal.guest_price = price
+
+                for comb_allergen in meal.find("note", NSPS).text.split(", "):
+                    # TODO: Differentiate allergen and additive!
+                    current_meal.add_allergen(comb_allergen)
+
+                curr_cat.add_meal(current_meal)
+            category_list.append(curr_cat)
+
+        date_dict[date] = category_list, meta_data
+    return date_dict
+
+
+def to_xml(
+    categories: list[Category], meta_data: list[str], canteen_name: str
+) -> ET.Element:
     # Define namespaces
     ns = {
         "": "http://openmensa.org/open-mensa-v2",

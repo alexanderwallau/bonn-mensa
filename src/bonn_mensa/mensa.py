@@ -22,7 +22,7 @@ if __package__ is None and not hasattr(sys, "frozen"):
 
 import bonn_mensa.version
 
-from .utils import SimpleMensaResponseParser, get_mensa_date, slugify, to_xml
+from .utils import SimpleMensaResponseParser, from_xml, get_mensa_date, slugify, to_xml
 
 meat_allergens: Dict[str, Set[str]] = {
     "de": {
