@@ -215,71 +215,72 @@ class SimpleMensaResponseParser(HTMLParser):
         else:
             raise NotImplementedError(f"{self.last_nonignored_tag} with data {data}")
 
-    def to_xml(self, canteen_name: str) -> ET.Element:
-        # Define namespaces
-        ns = {
-            "": "http://openmensa.org/open-mensa-v2",
-            "xsi": "http://www.w3.org/2001/XMLSchema-instance",
-        }
-        # Register namespaces
-        for prefix, uri in ns.items():
-            ET.register_namespace(prefix, uri)
-
-        # Create the root element with namespaces
-        root = ET.Element(
-            "openmensa",
-            {
-                "version": "2.1",
-                "xmlns": ns[""],
-                "xmlns:xsi": ns["xsi"],
-                "xsi:schemaLocation": (
-                    "http://openmensa.org/open-mensa-v2 "
-                    "http://openmensa.org/open-mensa-v2.xsd"
-                ),
-            },
-        )
-        # Add version element
-        version = ET.SubElement(root, "version")
-        version.text = "5.04-4"
-
-        # Create the canteen and Date element
-        canteen = ET.SubElement(root, "canteen")
-        day = ET.SubElement(canteen, "day")
-        day.set("date", str(datetime.date.today()))
-
-        if self.meta_data:
-            meta_data = ET.SubElement(day, "meta_data")
-            meta_data.text = ";".join(self.meta_data)
-
-        # Create the meals element
-
-        for cat in self.categories:
-            categories = ET.SubElement(day, "category")
-            categories.set("name", cat.title)
-            for meal in cat.meals:
-                meal_element = ET.SubElement(categories, "meal")
-                name = ET.SubElement(meal_element, "name")
-                name.text = meal.title
-                # Add allergens and Additives
-                allergens = ET.SubElement(meal_element, "note")
-                combined_list = meal.allergens + meal.additives
-                allergens.text = ", ".join(combined_list)
-                # Add prices
-                price = ET.SubElement(meal_element, "price")
-                price.set("role", "student")
-                if meal.student_price is not None:
-                    price.text = str(f"{meal.student_price / 100:.2f}")
-                price = ET.SubElement(meal_element, "price")
-                price.set("role", "employee")
-                if meal.staff_price is not None:
-                    price.text = str(f"{meal.staff_price / 100:.2f}")
-                price = ET.SubElement(meal_element, "price")
-                price.set("role", "other")
-                if meal.guest_price is not None:
-                    price.text = str(f"{meal.guest_price / 100:.2f}")
-
-        return root
-
     def close(self) -> None:
         super().close()
         self.start_new_category()
+
+
+def to_xml(categories: list[Category], meta_data: list[str], canteen_name: str) -> ET.Element:
+    # Define namespaces
+    ns = {
+        "": "http://openmensa.org/open-mensa-v2",
+        "xsi": "http://www.w3.org/2001/XMLSchema-instance",
+    }
+    # Register namespaces
+    for prefix, uri in ns.items():
+        ET.register_namespace(prefix, uri)
+
+    # Create the root element with namespaces
+    root = ET.Element(
+        "openmensa",
+        {
+            "version": "2.1",
+            "xmlns": ns[""],
+            "xmlns:xsi": ns["xsi"],
+            "xsi:schemaLocation": (
+                "http://openmensa.org/open-mensa-v2 "
+                "http://openmensa.org/open-mensa-v2.xsd"
+            ),
+        },
+    )
+    # Add version element
+    version = ET.SubElement(root, "version")
+    version.text = "5.04-4"
+
+    # Create the canteen and Date element
+    canteen = ET.SubElement(root, "canteen")
+    day = ET.SubElement(canteen, "day")
+    day.set("date", str(datetime.date.today()))
+
+    if meta_data:
+        meta_data = ET.SubElement(day, "meta_data")
+        meta_data.text = ";".join(meta_data)
+
+    # Create the meals element
+
+    for cat in categories:
+        categories = ET.SubElement(day, "category")
+        categories.set("name", cat.title)
+        for meal in cat.meals:
+            meal_element = ET.SubElement(categories, "meal")
+            name = ET.SubElement(meal_element, "name")
+            name.text = meal.title
+            # Add allergens and Additives
+            allergens = ET.SubElement(meal_element, "note")
+            combined_list = meal.allergens + meal.additives
+            allergens.text = ", ".join(combined_list)
+            # Add prices
+            price = ET.SubElement(meal_element, "price")
+            price.set("role", "student")
+            if meal.student_price is not None:
+                price.text = str(f"{meal.student_price / 100:.2f}")
+            price = ET.SubElement(meal_element, "price")
+            price.set("role", "employee")
+            if meal.staff_price is not None:
+                price.text = str(f"{meal.staff_price / 100:.2f}")
+            price = ET.SubElement(meal_element, "price")
+            price.set("role", "other")
+            if meal.guest_price is not None:
+                price.text = str(f"{meal.guest_price / 100:.2f}")
+
+    return root

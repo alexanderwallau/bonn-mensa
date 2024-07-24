@@ -22,7 +22,7 @@ if __package__ is None and not hasattr(sys, "frozen"):
 
 import bonn_mensa.version
 
-from .utils import SimpleMensaResponseParser, get_mensa_date, slugify
+from .utils import SimpleMensaResponseParser, get_mensa_date, slugify, to_xml
 
 meat_allergens: Dict[str, Set[str]] = {
     "de": {
@@ -251,7 +251,7 @@ def query_mensa(
             return f"{price / 100:.2f}€"
 
     if xml_output:
-        xml_root = parser.to_xml(canteen)
+        xml_root = to_xml(parser.categories, parser.meta_data, canteen_name=canteen)
         xml_tree = ET.ElementTree(xml_root)
 
         if xml_indent:
