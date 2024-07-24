@@ -251,7 +251,12 @@ def query_mensa(
             return f"{price / 100:.2f}€"
 
     if xml_output:
-        xml_root = to_xml(parser.categories, parser.meta_data, canteen_name=canteen)
+        xml_root = to_xml(
+            parser.categories,
+            parser.meta_data,
+            canteen_name=canteen,
+            date=date,
+        )
         xml_tree = ET.ElementTree(xml_root)
 
         if xml_indent:

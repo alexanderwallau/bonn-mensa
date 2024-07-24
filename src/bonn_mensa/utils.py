@@ -265,7 +265,7 @@ def from_xml(root: ET.Element) -> dict[str, tuple[list[Category], list[str]]]:
 
 
 def to_xml(
-    categories: list[Category], meta_data: list[str], canteen_name: str
+    categories: list[Category], meta_data: list[str], canteen_name: str, date: str
 ) -> ET.Element:
     # Define namespaces
     ns = {
@@ -296,7 +296,7 @@ def to_xml(
     # Create the canteen and Date element
     canteen = ET.SubElement(root, "canteen")
     day = ET.SubElement(canteen, "day")
-    day.set("date", str(datetime.date.today()))
+    day.set("date", date)
 
     if meta_data:
         meta_data = ET.SubElement(day, "meta_data")
