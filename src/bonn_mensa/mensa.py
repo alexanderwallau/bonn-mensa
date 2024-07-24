@@ -266,7 +266,6 @@ class SimpleMensaResponseParser(HTMLParser):
         if self.mode == "IGNORE" or not data.strip():
             return
         if self.mode in ["INIT", "INFO"]:
-            print(data)
             self.meta_data.append(data)
             return
         data = data.strip()
@@ -472,6 +471,9 @@ def query_mensa(
     parser = SimpleMensaResponseParser(lang=language, verbose=verbose)
     parser.feed(r.text)
     parser.close()
+
+    if not xml_output and parser.meta_data:
+        print("\n" + "\n".join(parser.meta_data) + "\n")
 
     if not parser.categories:
         print(
