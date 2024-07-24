@@ -497,6 +497,19 @@ def query_mensa(
         else:
             return f"{price / 100:.2f}€"
 
+    if xml_output:
+        xml_root = parser.to_xml(canteen)
+        xml_tree = ET.ElementTree(xml_root)
+
+        if xml_indent:
+            ET.indent(xml_tree)
+
+        filename = f"{canteen}_{date}_{time.time()}.xml"
+        xml_tree.write(
+            filename, encoding="utf-8", xml_declaration=True, method="xml"
+        )
+        print(f"XML saved to {filename}")
+
     for cat in queried_categories:
         filtered_meals = [
             meal for meal in cat.meals if not set(meal.allergens) & remove_allergens
@@ -531,21 +544,7 @@ def query_mensa(
                     print(f" {additives_str} |", end="")
 
                 print("")
-        elif xml_output:
-            xml_root = parser.to_xml(canteen)
-            xml_tree = ET.ElementTree(xml_root)
-
-            if xml_indent:
-                ET.indent(xml_tree)
-
-            cat_title = cat.title.replace("& ", "").replace(" ", "-")
-
-            filename = f"{canteen}_{cat_title}_{date}_{time.time()}.xml"
-            xml_tree.write(
-                filename, encoding="utf-8", xml_declaration=True, method="xml"
-            )
-            print(f"XML saved to {filename}")
-        else:
+        elif not xml_output:
             cat_str = cat.title.ljust(maxlen_catname + 1)
             print(f"{CATEGORY_COLOR}{cat_str}{RESET_COLOR}", end="")
 
@@ -677,7 +676,7 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Save canteen pan with all allergens as xml. "
         "If no filename is given the resulting "
-        "xml will be saved as <canteen name>_<category>_<time>.",
+        "xml will be saved as <canteen name>_<time>.",
     )
     parser.add_argument(
         "--glutenfree",
