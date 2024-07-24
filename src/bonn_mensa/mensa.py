@@ -403,7 +403,7 @@ def query_mensa(
     filter_str = f" [{filter_mode}]" if filter_mode else ""
     if markdown_output:
         print(f"### Mensa {canteen} – {date}{filter_str} [{language}]\n")
-    else:
+    elif not xml_output:
         print(
             f"{QUERY_COLOR}Mensa {canteen} – {date}{filter_str} [{language}]{RESET_COLOR}"
         )
@@ -429,7 +429,6 @@ def query_mensa(
             f"{WARN_COLOR}Query failed. Please check https://www.studierendenwerk-bonn.de if the mensa is open today.{RESET_COLOR}"
         )
         return
-    print()
 
     queried_categories = [
         cat for cat in parser.categories if cat.title not in filtered_categories
@@ -507,6 +506,16 @@ def query_mensa(
                     print(f" {additives_str} |", end="")
 
                 print("")
+        elif xml_output:
+            xml_root = parser.to_xml(canteen)
+            xml_tree = ET.ElementTree(xml_root)
+            cat_title = cat.title.replace("& ", "").replace(" ", "-")
+
+            filename = f"{canteen}_{cat_title}_{date}_{time.time()}.xml"
+            xml_tree.write(
+                filename, encoding="utf-8", xml_declaration=True, method="xml"
+            )
+            print(f"XML saved to {filename}")
         else:
             cat_str = cat.title.ljust(maxlen_catname + 1)
             print(f"{CATEGORY_COLOR}{cat_str}{RESET_COLOR}", end="")
@@ -546,16 +555,6 @@ def query_mensa(
                     print(f" {ADDITIVE_COLOR}[{additives_str}]", end="")
 
                 print(f"{RESET_COLOR}")
-        if xml_output:
-            xml_root = parser.to_xml(canteen)
-            xml_tree = ET.ElementTree(xml_root)
-            cat_title = cat.title.replace("& ", "").replace(" ", "-")
-
-            filename = f"{canteen}_{cat_title}_{date}_{time.time()}.xml"
-            xml_tree.write(
-                filename, encoding="utf-8", xml_declaration=True, method="xml"
-            )
-            print(f"XML saved to {filename}")
 
 
 def get_parser():
