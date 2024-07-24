@@ -470,7 +470,7 @@ def query_mensa(
         print(
             f"{WARN_COLOR}"
             "Query failed. Please check https://www.studierendenwerk-bonn.de"
-            f" if the mensa is open today."
+            f" if the mensa '{canteen}' is open at {date}."
             f"{RESET_COLOR}"
         )
         return
