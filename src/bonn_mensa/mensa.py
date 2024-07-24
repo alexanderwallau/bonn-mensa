@@ -216,6 +216,8 @@ class SimpleMensaResponseParser(HTMLParser):
         self.lang = lang
         self.verbose = verbose
 
+        self.meta_data: list[str] = []
+
     def start_new_category(self) -> None:
         if self.curr_category:
             if self.curr_meal:
@@ -265,6 +267,7 @@ class SimpleMensaResponseParser(HTMLParser):
             return
         if self.mode in ["INIT", "INFO"]:
             print(data)
+            self.meta_data.append(data)
             return
         data = data.strip()
         if self.mode == "NEW_CAT":
@@ -347,6 +350,10 @@ class SimpleMensaResponseParser(HTMLParser):
         canteen = ET.SubElement(root, "canteen")
         day = ET.SubElement(canteen, "day")
         day.set("date", str(datetime.date.today()))
+
+        if self.meta_data:
+            meta_data = ET.SubElement(day, "meta_data")
+            meta_data.text = ";".join(self.meta_data)
 
         # Create the meals element
 
