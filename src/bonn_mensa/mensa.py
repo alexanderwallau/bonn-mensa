@@ -262,7 +262,7 @@ def query_mensa(
         if xml_indent:
             ET.indent(xml_tree)
 
-        filestem = slugify(f"{canteen}_{date}_{time.time()}")
+        filestem = slugify(f"{canteen}_{language}_{date}_{time.time()}")
         filename = f"{filestem}.xml"
         xml_tree.write(filename, encoding="utf-8", xml_declaration=True, method="xml")
         print(f"XML saved to {filename}")
@@ -433,7 +433,7 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Save canteen pan with all allergens as xml. "
         "If no filename is given the resulting "
-        "xml will be saved as <canteen name>_<time>.",
+        "xml will be saved as <canteen name>_<lang>_<date>_<time>.",
     )
     parser.add_argument(
         "--glutenfree",
