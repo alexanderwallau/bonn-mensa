@@ -356,8 +356,7 @@ class SimpleMensaResponseParser(HTMLParser):
         self.start_new_category()
 
 
-def get_mensa_data() -> datetime.date:
-    print("Fetching mensa data...")
+def get_mensa_date() -> datetime.date:
     # Since the canteenes ar elocated in NRW get the public holidays for NRW
     nrw_holidays = holidays.country_holidays("DE", subdiv="NW")
 
@@ -393,7 +392,7 @@ def query_mensa(
         # If no date is provided get next valid day
         #   i.e. working days from monday to friday
         # this does not take into account closures due to operational reasons
-        date = get_mensa_data().strftime("%Y-%m-%d")
+        date = get_mensa_date().strftime("%Y-%m-%d")
 
     if colors:
         QUERY_COLOR = Fore.MAGENTA
@@ -678,7 +677,7 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Save canteen pan with all allergens as xml. "
         "If no filename is given the resulting "
-        "xml will be saved as <canteen name>_<time>.",
+        "xml will be saved as <canteen name>_<category>_<time>.",
     )
     parser.add_argument(
         "--glutenfree",
