@@ -1,17 +1,16 @@
 import argparse
+import datetime
 import sys
+import time
+import xml.etree.ElementTree as ET
 from ast import parse
 from html.parser import HTMLParser
-import time
 from typing import Dict, List, Optional, Set
 
-import requests
-from colorama import Fore, Style, init as colorama_init
-import xml.etree.ElementTree as ET
-
-
-import datetime
 import holidays
+import requests
+from colorama import Fore, Style
+from colorama import init as colorama_init
 
 # simulates relative imports for the case where this script is run directly from the command line
 # -> behaves as if it was run as `python -m bonn_mensa.mensa`
@@ -176,7 +175,7 @@ class Category:
 
 
 class SimpleMensaResponseParser(HTMLParser):
-    def __init__(self, lang: str, verbose: bool = False):
+    def __init__(self, lang: str, verbose: bool = False) -> None:
         super().__init__()
         self.curr_category: Optional[Category] = None
         self.curr_meal: Optional[Meal] = None
@@ -189,7 +188,7 @@ class SimpleMensaResponseParser(HTMLParser):
         self.lang = lang
         self.verbose = verbose
 
-    def start_new_category(self):
+    def start_new_category(self) -> None:
         if self.curr_category:
             if self.curr_meal:
                 self.curr_category.add_meal(self.curr_meal)
@@ -199,7 +198,7 @@ class SimpleMensaResponseParser(HTMLParser):
 
         self.mode = "NEW_CAT"
 
-    def start_new_meal(self):
+    def start_new_meal(self) -> None:
         if not self.curr_category:
             self.curr_category = Category("DUMMY-Name")
 
@@ -209,7 +208,7 @@ class SimpleMensaResponseParser(HTMLParser):
 
         self.mode = "NEW_MEAL"
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         # skip non-empty attributes
         if attrs or tag not in ["h2", "h5", "strong", "p", "th", "td", "br"]:
             self.mode = "IGNORE"
@@ -233,7 +232,7 @@ class SimpleMensaResponseParser(HTMLParser):
     def parse_price(self, price: str) -> int:
         return int("".join(digit for digit in price if digit.isdigit()))
 
-    def handle_data(self, data):
+    def handle_data(self, data: str) -> None:
         if self.mode == "IGNORE" or not data.strip():
             return
         if self.mode in ["INIT", "INFO"]:
@@ -258,10 +257,12 @@ class SimpleMensaResponseParser(HTMLParser):
         elif self.mode == "NEW_ALLERGENS":
             if self.verbose:
                 print(f"\t\tAdding new allergen: {data}")
+            assert self.curr_meal is not None
             self.curr_meal.add_allergen(data)
         elif self.mode == "NEW_ADDITIVES":
             if self.verbose:
                 print(f"\t\tAdding new additive: {data}")
+            assert self.curr_meal is not None
             self.curr_meal.add_additive(data)
         elif self.mode == "NEW_PRICE_CAT":
             if data == content_strings["PRICE_CATEGORY_STUDENT"][self.lang]:
@@ -274,17 +275,20 @@ class SimpleMensaResponseParser(HTMLParser):
                 raise NotImplementedError(f"Mode NEW_PRICE_CAT with data {data}")
         elif self.mode == "NEW_PRICE_STUDENT":
             assert self.last_nonignored_tag == "td"
+            assert self.curr_meal is not None
             self.curr_meal.student_price = self.parse_price(data)
         elif self.mode == "NEW_PRICE_STAFF":
             assert self.last_nonignored_tag == "td"
+            assert self.curr_meal is not None
             self.curr_meal.staff_price = self.parse_price(data)
         elif self.mode == "NEW_PRICE_GUEST":
             assert self.last_nonignored_tag == "td"
+            assert self.curr_meal is not None
             self.curr_meal.guest_price = self.parse_price(data)
         else:
             raise NotImplementedError(f"{self.last_nonignored_tag} with data {data}")
 
-    def to_xml(self, wCanteen) -> ET.Element:
+    def to_xml(self, wCanteen: str) -> ET.Element:
         # Define namespaces
         ns = {
             "": "http://openmensa.org/open-mensa-v2",
@@ -329,17 +333,20 @@ class SimpleMensaResponseParser(HTMLParser):
                 # Add prices
                 price = ET.SubElement(meal_element, "price")
                 price.set("role", "student")
-                price.text = str(f"{meal.student_price / 100:.2f}")
+                if meal.student_price is not None:
+                    price.text = str(f"{meal.student_price / 100:.2f}")
                 price = ET.SubElement(meal_element, "price")
                 price.set("role", "employee")
-                price.text = str(f"{meal.staff_price / 100:.2f}")
+                if meal.staff_price is not None:
+                    price.text = str(f"{meal.staff_price / 100:.2f}")
                 price = ET.SubElement(meal_element, "price")
                 price.set("role", "other")
-                price.text = str(f"{meal.guest_price / 100:.2f}")
+                if meal.guest_price is not None:
+                    price.text = str(f"{meal.guest_price / 100:.2f}")
 
         return root
 
-    def close(self):
+    def close(self) -> None:
         super().close()
         self.start_new_category()
 
@@ -473,6 +480,12 @@ def query_mensa(
         else:
             print()
 
+    def _fmt_price(price: Optional[int]) -> str:
+        if price is None:
+            return "--€"
+        else:
+            return f"{price / 100:.2f}€"
+
     for cat in queried_categories:
         filtered_meals = [
             meal for meal in cat.meals if not set(meal.allergens) & remove_allergens
@@ -488,11 +501,11 @@ def query_mensa(
                 else:
                     print(f"| {cat.title} |", end="")
                 if price == "Student":
-                    print(f" {meal.title} | {meal.student_price/100:.2f}€ |", end="")
+                    print(f" {meal.title} | {_fmt_price(meal.student_price)} |", end="")
                 if price == "Staff":
-                    print(f" {meal.title} | {meal.staff_price/100:.2f}€ |", end="")
+                    print(f" {meal.title} | {_fmt_price(meal.staff_price)} |", end="")
                 if price == "Guest":
-                    print(f" {meal.title} | {meal.guest_price/100:.2f}€ |", end="")
+                    print(f" {meal.title} | {_fmt_price(meal.guest_price)} |", end="")
 
                 if show_all_allergens:
                     allergen_str = ", ".join(meal.allergens)
@@ -531,17 +544,17 @@ def query_mensa(
                     print(" " * (maxlen_catname + 1), end="")
                 if price == "Student":
                     print(
-                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({meal.student_price/100:.2f}€)",
+                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({_fmt_price(meal.student_price)})",
                         end="",
                     )
                 if price == "Staff":
                     print(
-                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({meal.staff_price/100:.2f}€)",
+                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({_fmt_price(meal.staff_price)})",
                         end="",
                     )
                 if price == "Guest":
                     print(
-                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({meal.guest_price/100:.2f}€)",
+                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({_fmt_price(meal.guest_price)})",
                         end="",
                     )
                 if meal.allergens and (
@@ -562,7 +575,7 @@ def query_mensa(
                 print(f"{RESET_COLOR}")
 
 
-def get_parser():
+def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser("mensa")
     filter_group = parser.add_mutually_exclusive_group()
     filter_group.add_argument(
@@ -656,12 +669,12 @@ def get_parser():
     parser.add_argument(
         "--indent-xml",
         action="store_true",
-        help="Indent the generated XML files for better readability."
+        help="Indent the generated XML files for better readability.",
     )
     return parser
 
 
-def run_cmd(args):
+def run_cmd(args: argparse.Namespace) -> None:
     if args.vegan:
         filter_mode: Optional[str] = "vegan"
     elif args.vegetarian:
@@ -687,7 +700,7 @@ def run_cmd(args):
     )
 
 
-def main():
+def main() -> None:
     colorama_init()
     args = get_parser().parse_args()
     run_cmd(args)
