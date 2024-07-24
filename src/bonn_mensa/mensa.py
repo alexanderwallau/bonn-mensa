@@ -1,9 +1,10 @@
+"""Query meal plans for university canteens in Bonn."""
+
 import argparse
 import datetime
 import sys
 import time
 import xml.etree.ElementTree as ET
-from ast import parse
 from html.parser import HTMLParser
 from typing import Dict, List, Optional, Set
 
@@ -12,7 +13,8 @@ import requests
 from colorama import Fore, Style
 from colorama import init as colorama_init
 
-# simulates relative imports for the case where this script is run directly from the command line
+# simulates relative imports for the case where this script
+# is run directly from the command line
 # -> behaves as if it was run as `python -m bonn_mensa.mensa`
 # -> always behaves if it was installed as a package
 if __package__ is None and not hasattr(sys, "frozen"):
@@ -288,7 +290,7 @@ class SimpleMensaResponseParser(HTMLParser):
         else:
             raise NotImplementedError(f"{self.last_nonignored_tag} with data {data}")
 
-    def to_xml(self, wCanteen: str) -> ET.Element:
+    def to_xml(self, canteen: str) -> ET.Element:
         # Define namespaces
         ns = {
             "": "http://openmensa.org/open-mensa-v2",
@@ -305,7 +307,10 @@ class SimpleMensaResponseParser(HTMLParser):
                 "version": "2.1",
                 "xmlns": ns[""],
                 "xmlns:xsi": ns["xsi"],
-                "xsi:schemaLocation": "http://openmensa.org/open-mensa-v2 http://openmensa.org/open-mensa-v2.xsd",
+                "xsi:schemaLocation": (
+                    "http://openmensa.org/open-mensa-v2 "
+                    "http://openmensa.org/open-mensa-v2.xsd"
+                ),
             },
         )
         # Add version element
@@ -385,7 +390,8 @@ def query_mensa(
     xml_indent: bool = False,
 ) -> None:
     if date is None:
-        # If no date is provided get next valid day i.E. working days from monday to fridy
+        # If no date is provided get next valid day
+        #   i.e. working days from monday to friday
         # this does not take into account closures due to operational reasons
         date = get_mensa_data().strftime("%Y-%m-%d")
 
@@ -413,12 +419,15 @@ def query_mensa(
         print(f"### Mensa {canteen} – {date}{filter_str} [{language}]\n")
     elif not xml_output:
         print(
-            f"{QUERY_COLOR}Mensa {canteen} – {date}{filter_str} [{language}]{RESET_COLOR}"
+            f"{QUERY_COLOR}"
+            f"Mensa {canteen} – {date}{filter_str} [{language}]"
+            f"{RESET_COLOR}"
         )
 
     if verbose:
         print(
-            f"Querying for {date=}, {canteen=}, {filtered_categories=}, {filter_mode=}, {url=}"
+            f"Querying for {date=}, {canteen=}, "
+            f"{filtered_categories=}, {filter_mode=}, {url=}"
         )
     r = requests.post(
         url,
@@ -434,7 +443,10 @@ def query_mensa(
 
     if not parser.categories:
         print(
-            f"{WARN_COLOR}Query failed. Please check https://www.studierendenwerk-bonn.de if the mensa is open today.{RESET_COLOR}"
+            f"{WARN_COLOR}"
+            "Query failed. Please check https://www.studierendenwerk-bonn.de"
+            f" if the mensa is open today."
+            f"{RESET_COLOR}"
         )
         return
 
@@ -474,7 +486,7 @@ def query_mensa(
         if show_additives:
             print(f"| {output_strs['MD_TABLE_COL_ADDITIVES'][language]}", end="")
         print("|")
-        print(f"| :-- | :-- | --: | :-- | ", end="")
+        print("| :-- | :-- | --: | :-- | ", end="")
         if show_additives:
             print(":-- |")
         else:
@@ -497,7 +509,7 @@ def query_mensa(
         if markdown_output:
             for meal_idx, meal in enumerate(filtered_meals):
                 if meal_idx:
-                    print(f"| |", end="")
+                    print("| |", end="")
                 else:
                     print(f"| {cat.title} |", end="")
                 if price == "Student":
@@ -544,17 +556,20 @@ def query_mensa(
                     print(" " * (maxlen_catname + 1), end="")
                 if price == "Student":
                     print(
-                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({_fmt_price(meal.student_price)})",
+                        f"{MEAL_COLOR}"
+                        f"{meal.title} {PRICE_COLOR}({_fmt_price(meal.student_price)})",
                         end="",
                     )
                 if price == "Staff":
                     print(
-                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({_fmt_price(meal.staff_price)})",
+                        f"{MEAL_COLOR}"
+                        f"{meal.title} {PRICE_COLOR}({_fmt_price(meal.staff_price)})",
                         end="",
                     )
                 if price == "Guest":
                     print(
-                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({_fmt_price(meal.guest_price)})",
+                        f"{MEAL_COLOR}"
+                        f"{meal.title} {PRICE_COLOR}({_fmt_price(meal.guest_price)})",
                         end="",
                     )
                 if meal.allergens and (
@@ -576,6 +591,7 @@ def query_mensa(
 
 
 def get_parser() -> argparse.ArgumentParser:
+    """Construct an argument parser."""
     parser = argparse.ArgumentParser("mensa")
     filter_group = parser.add_mutually_exclusive_group()
     filter_group.add_argument(
@@ -622,7 +638,8 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--show-all-allergens",
         action="store_true",
-        help="Show all allergens. By default, only allergens relevant to vegans (e.g. milk or fish) are shown.",
+        help="Show all allergens. "
+        "By default, only allergens relevant to vegans (e.g. milk or fish) are shown.",
     )
 
     parser.add_argument(
@@ -652,14 +669,16 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"bonn-mensa v{bonn_mensa.version.__version__} (https://github.com/alexanderwallau/bonn-mensa)",
+        version=f"bonn-mensa v{bonn_mensa.version.__version__} "
+        "(https://github.com/alexanderwallau/bonn-mensa)",
     )
 
     parser.add_argument(
         "--xml",
         action="store_true",
-        help="""Save canteen pan with all allergens as xml. If no filename is given the resulting
-            xml will be saved as <canteen name>_<time>.""",
+        help="Save canteen pan with all allergens as xml. "
+        "If no filename is given the resulting "
+        "xml will be saved as <canteen name>_<time>.",
     )
     parser.add_argument(
         "--glutenfree",
@@ -675,6 +694,7 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 def run_cmd(args: argparse.Namespace) -> None:
+    """Run the meal plan query."""
     if args.vegan:
         filter_mode: Optional[str] = "vegan"
     elif args.vegetarian:
@@ -701,6 +721,7 @@ def run_cmd(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    """Program entry point."""
     colorama_init()
     args = get_parser().parse_args()
     run_cmd(args)
