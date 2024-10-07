@@ -1,19 +1,17 @@
+"""Query meal plans for university canteens in Bonn."""
+
 import argparse
 import sys
-from ast import parse
-from html.parser import HTMLParser
 import time
+import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Set
 
 import requests
-from colorama import Fore, Style, init as colorama_init
-import xml.etree.ElementTree as ET
+from colorama import Fore, Style
+from colorama import init as colorama_init
 
-
-import datetime
-import holidays
-
-# simulates relative imports for the case where this script is run directly from the command line
+# simulates relative imports for the case where this script
+# is run directly from the command line
 # -> behaves as if it was run as `python -m bonn_mensa.mensa`
 # -> always behaves if it was installed as a package
 if __package__ is None and not hasattr(sys, "frozen"):
@@ -23,6 +21,8 @@ if __package__ is None and not hasattr(sys, "frozen"):
     sys.path.insert(0, os.path.dirname(os.path.dirname(path)))
 
 import bonn_mensa.version
+
+from .utils import SimpleMensaResponseParser, from_xml, get_mensa_date, slugify, to_xml
 
 meat_allergens: Dict[str, Set[str]] = {
     "de": {
@@ -93,29 +93,6 @@ language_id_dict = {
     "en": "1",
 }
 
-content_strings = {
-    "NEW_INFOS_ALLERGENS": {
-        "de": "Allergene",
-        "en": "Allergens",
-    },
-    "NEW_INFOS_ADDITIVES": {
-        "de": "Zusatzstoffe",
-        "en": "Additives",
-    },
-    "PRICE_CATEGORY_STUDENT": {
-        "de": "Stud.",
-        "en": "Student",
-    },
-    "PRICE_CATEGORY_STAFF": {
-        "de": "Bed.",
-        "en": "Staff",
-    },
-    "PRICE_CATEGORY_GUEST": {
-        "de": "Gast",
-        "en": "Guest",
-    },
-}
-
 output_strs = {
     "MD_TABLE_COL_CAT": {
         "de": "Kategorie",
@@ -144,216 +121,6 @@ output_strs = {
 }
 
 
-class Meal:
-    def __init__(self, title: str) -> None:
-        self.title = title
-        self.allergens: List[str] = []
-        self.additives: List[str] = []
-        self.student_price: Optional[int] = None
-        self.staff_price: Optional[int] = None
-        self.guest_price: Optional[int] = None
-
-    def add_allergen(self, allergen: str) -> None:
-        self.allergens.append(allergen)
-
-    def add_additive(self, additive: str) -> None:
-        self.additives.append(additive)
-
-
-class Category:
-    def __init__(self, title: str) -> None:
-        self.title = title
-        self.meals: List[Meal] = []
-
-    def add_meal(self, meal: Meal) -> None:
-        self.meals.append(meal)
-
-
-class SimpleMensaResponseParser(HTMLParser):
-    def __init__(self, lang: str, verbose: bool = False):
-        super().__init__()
-        self.curr_category: Optional[Category] = None
-        self.curr_meal: Optional[Meal] = None
-
-        self.last_tag: Optional[str] = None
-        self.last_nonignored_tag: Optional[str] = None
-        self.categories: List[Category] = []
-        self.mode = "INIT"
-
-        self.lang = lang
-        self.verbose = verbose
-
-    def start_new_category(self):
-        if self.curr_category:
-            if self.curr_meal:
-                self.curr_category.add_meal(self.curr_meal)
-                self.curr_meal = None
-            self.categories.append(self.curr_category)
-            self.curr_category = None
-
-        self.mode = "NEW_CAT"
-
-    def start_new_meal(self):
-        if not self.curr_category:
-            self.curr_category = Category("DUMMY-Name")
-
-        if self.curr_meal:
-            self.curr_category.add_meal(self.curr_meal)
-            self.curr_meal = None
-
-        self.mode = "NEW_MEAL"
-
-    def handle_starttag(self, tag, attrs):
-        # skip non-empty attributes
-        if attrs or tag not in ["h2", "h5", "strong", "p", "th", "td", "br"]:
-            self.mode = "IGNORE"
-            return
-
-        self.last_nonignored_tag = tag
-        if tag == "h2":
-            self.start_new_category()
-        elif tag == "h5":
-            self.start_new_meal()
-        elif tag == "strong":
-            self.mode = "NEW_INFOS"
-        elif tag == "p":
-            if not self.curr_meal and not self.curr_category:
-                self.mode = "INFO"
-        elif tag == "th":
-            self.mode = "NEW_PRICE_CAT"
-        elif tag == "td":
-            pass
-
-    def parse_price(self, price: str) -> int:
-        return int("".join(digit for digit in price if digit.isdigit()))
-
-    def handle_data(self, data):
-        if self.mode == "IGNORE" or not data.strip():
-            return
-        if self.mode in ["INIT", "INFO"]:
-            print(data)
-            return
-        data = data.strip()
-        if self.mode == "NEW_CAT":
-            self.curr_category = Category(data)
-            if self.verbose:
-                print(f"Creating new category {data}")
-        elif self.mode == "NEW_MEAL":
-            self.curr_meal = Meal(data)
-            if self.verbose:
-                print(f"\tCreating new meal {data}")
-        elif self.mode == "NEW_INFOS":
-            if data == content_strings["NEW_INFOS_ALLERGENS"][self.lang]:
-                self.mode = "NEW_ALLERGENS"
-            elif data == content_strings["NEW_INFOS_ADDITIVES"][self.lang]:
-                self.mode = "NEW_ADDITIVES"
-            else:
-                raise NotImplementedError(f"Mode NEW_INFOS with data {data}")
-        elif self.mode == "NEW_ALLERGENS":
-            if self.verbose:
-                print(f"\t\tAdding new allergen: {data}")
-            self.curr_meal.add_allergen(data)
-        elif self.mode == "NEW_ADDITIVES":
-            if self.verbose:
-                print(f"\t\tAdding new additive: {data}")
-            self.curr_meal.add_additive(data)
-        elif self.mode == "NEW_PRICE_CAT":
-            if data == content_strings["PRICE_CATEGORY_STUDENT"][self.lang]:
-                self.mode = "NEW_PRICE_STUDENT"
-            elif data == content_strings["PRICE_CATEGORY_STAFF"][self.lang]:
-                self.mode = "NEW_PRICE_STAFF"
-            elif data == content_strings["PRICE_CATEGORY_GUEST"][self.lang]:
-                self.mode = "NEW_PRICE_GUEST"
-            else:
-                raise NotImplementedError(f"Mode NEW_PRICE_CAT with data {data}")
-        elif self.mode == "NEW_PRICE_STUDENT":
-            assert self.last_nonignored_tag == "td"
-            self.curr_meal.student_price = self.parse_price(data)
-        elif self.mode == "NEW_PRICE_STAFF":
-            assert self.last_nonignored_tag == "td"
-            self.curr_meal.staff_price = self.parse_price(data)
-        elif self.mode == "NEW_PRICE_GUEST":
-            assert self.last_nonignored_tag == "td"
-            self.curr_meal.guest_price = self.parse_price(data)
-        else:
-            raise NotImplementedError(f"{self.last_nonignored_tag} with data {data}")
-
-    def to_xml(self, wCanteen) -> ET.Element:
-        # Define namespaces
-        ns = {
-            "": "http://openmensa.org/open-mensa-v2",
-            "xsi": "http://www.w3.org/2001/XMLSchema-instance",
-        }
-        # Register namespaces
-        for prefix, uri in ns.items():
-            ET.register_namespace(prefix, uri)
-
-        # Create the root element with namespaces
-        root = ET.Element(
-            "openmensa",
-            {
-                "version": "2.1",
-                "xmlns": ns[""],
-                "xmlns:xsi": ns["xsi"],
-                "xsi:schemaLocation": "http://openmensa.org/open-mensa-v2 http://openmensa.org/open-mensa-v2.xsd",
-            },
-        )
-        # Add version element
-        version = ET.SubElement(root, "version")
-        version.text = "5.04-4"
-
-        # Create the canteen and Date element
-        canteen = ET.SubElement(root, "canteen")
-        day = ET.SubElement(canteen, "day")
-        day.set("date", str(datetime.date.today()))
-
-        # Create the meals element
-
-        for cat in self.categories:
-            categories = ET.SubElement(day, "category")
-            categories.set("name", cat.title)
-            for meal in cat.meals:
-                meal_element = ET.SubElement(categories, "meal")
-                name = ET.SubElement(meal_element, "name")
-                name.text = meal.title
-                # Add allergens and Additives
-                allergens = ET.SubElement(meal_element, "note")
-                combined_list = meal.allergens + meal.additives
-                allergens.text = ", ".join(combined_list)
-                # Add prices
-                price = ET.SubElement(meal_element, "price")
-                price.set("role", "student")
-                price.text = str(f"{meal.student_price / 100:.2f}")
-                price = ET.SubElement(meal_element, "price")
-                price.set("role", "employee")
-                price.text = str(f"{meal.staff_price / 100:.2f}")
-                price = ET.SubElement(meal_element, "price")
-                price.set("role", "other")
-                price.text = str(f"{meal.guest_price / 100:.2f}")
-
-        return root
-
-    def close(self):
-        super().close()
-        self.start_new_category()
-
-
-def get_mensa_data() -> datetime.date:
-    print("Fetching mensa data...")
-    # Since the canteenes ar elocated in NRW get the public holidays for NRW
-    nrw_holidays = holidays.country_holidays("DE", subdiv="NW")
-
-    date = datetime.date.today()
-    # Initialize the next working day as the day after today
-    next_working_day = date + datetime.timedelta()
-
-    # Loop until we find a day that is not a weekend or a public holiday
-    while next_working_day.weekday() >= 5 or next_working_day in nrw_holidays:
-        next_working_day += datetime.timedelta(days=1)
-
-    return next_working_day
-
-
 def query_mensa(
     date: Optional[str],
     canteen: str,
@@ -369,11 +136,13 @@ def query_mensa(
     colors: bool = True,
     markdown_output: bool = False,
     xml_output: bool = False,
+    xml_indent: bool = False,
 ) -> None:
     if date is None:
-        # If no date is provided get next valid day i.E. working days from monday to fridy
+        # If no date is provided get next valid day
+        #   i.e. working days from monday to friday
         # this does not take into account closures due to operational reasons
-        date = get_mensa_data().strftime("%Y-%m-%d")
+        date = get_mensa_date().strftime("%Y-%m-%d")
 
     if colors:
         QUERY_COLOR = Fore.MAGENTA
@@ -397,14 +166,17 @@ def query_mensa(
     filter_str = f" [{filter_mode}]" if filter_mode else ""
     if markdown_output:
         print(f"### Mensa {canteen} – {date}{filter_str} [{language}]\n")
-    else:
+    elif not xml_output:
         print(
-            f"{QUERY_COLOR}Mensa {canteen} – {date}{filter_str} [{language}]{RESET_COLOR}"
+            f"{QUERY_COLOR}"
+            f"Mensa {canteen} – {date}{filter_str} [{language}]"
+            f"{RESET_COLOR}"
         )
 
     if verbose:
         print(
-            f"Querying for {date=}, {canteen=}, {filtered_categories=}, {filter_mode=}, {url=}"
+            f"Querying for {date=}, {canteen=}, "
+            f"{filtered_categories=}, {filter_mode=}, {url=}"
         )
     r = requests.post(
         url,
@@ -418,12 +190,17 @@ def query_mensa(
     parser.feed(r.text)
     parser.close()
 
+    if not xml_output and parser.meta_data:
+        print("\n" + "\n".join(parser.meta_data) + "\n")
+
     if not parser.categories:
         print(
-            f"{WARN_COLOR}Query failed. Please check https://www.studierendenwerk-bonn.de if the mensa is open today.{RESET_COLOR}"
+            f"{WARN_COLOR}"
+            "Query failed. Please check https://www.studierendenwerk-bonn.de"
+            f" if the mensa '{canteen}' is open at {date}."
+            f"{RESET_COLOR}"
         )
         return
-    print()
 
     queried_categories = [
         cat for cat in parser.categories if cat.title not in filtered_categories
@@ -461,11 +238,34 @@ def query_mensa(
         if show_additives:
             print(f"| {output_strs['MD_TABLE_COL_ADDITIVES'][language]}", end="")
         print("|")
-        print(f"| :-- | :-- | --: | :-- | ", end="")
+        print("| :-- | :-- | --: | :-- | ", end="")
         if show_additives:
             print(":-- |")
         else:
             print()
+
+    def _fmt_price(price: Optional[int]) -> str:
+        if price is None:
+            return "--€"
+        else:
+            return f"{price / 100:.2f}€"
+
+    if xml_output:
+        xml_root = to_xml(
+            parser.categories,
+            parser.meta_data,
+            canteen_name=canteen,
+            date=date,
+        )
+        xml_tree = ET.ElementTree(xml_root)
+
+        if xml_indent:
+            ET.indent(xml_tree)
+
+        filestem = slugify(f"{canteen}_{language}_{date}_{time.time()}")
+        filename = f"{filestem}.xml"
+        xml_tree.write(filename, encoding="utf-8", xml_declaration=True, method="xml")
+        print(f"XML saved to {filename}")
 
     for cat in queried_categories:
         filtered_meals = [
@@ -478,15 +278,15 @@ def query_mensa(
         if markdown_output:
             for meal_idx, meal in enumerate(filtered_meals):
                 if meal_idx:
-                    print(f"| |", end="")
+                    print("| |", end="")
                 else:
                     print(f"| {cat.title} |", end="")
                 if price == "Student":
-                    print(f" {meal.title} | {meal.student_price/100:.2f}€ |", end="")
+                    print(f" {meal.title} | {_fmt_price(meal.student_price)} |", end="")
                 if price == "Staff":
-                    print(f" {meal.title} | {meal.staff_price/100:.2f}€ |", end="")
+                    print(f" {meal.title} | {_fmt_price(meal.staff_price)} |", end="")
                 if price == "Guest":
-                    print(f" {meal.title} | {meal.guest_price/100:.2f}€ |", end="")
+                    print(f" {meal.title} | {_fmt_price(meal.guest_price)} |", end="")
 
                 if show_all_allergens:
                     allergen_str = ", ".join(meal.allergens)
@@ -501,7 +301,7 @@ def query_mensa(
                     print(f" {additives_str} |", end="")
 
                 print("")
-        else:
+        elif not xml_output:
             cat_str = cat.title.ljust(maxlen_catname + 1)
             print(f"{CATEGORY_COLOR}{cat_str}{RESET_COLOR}", end="")
 
@@ -511,17 +311,20 @@ def query_mensa(
                     print(" " * (maxlen_catname + 1), end="")
                 if price == "Student":
                     print(
-                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({meal.student_price/100:.2f}€)",
+                        f"{MEAL_COLOR}"
+                        f"{meal.title} {PRICE_COLOR}({_fmt_price(meal.student_price)})",
                         end="",
                     )
                 if price == "Staff":
                     print(
-                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({meal.staff_price/100:.2f}€)",
+                        f"{MEAL_COLOR}"
+                        f"{meal.title} {PRICE_COLOR}({_fmt_price(meal.staff_price)})",
                         end="",
                     )
                 if price == "Guest":
                     print(
-                        f"{MEAL_COLOR}{meal.title} {PRICE_COLOR}({meal.guest_price/100:.2f}€)",
+                        f"{MEAL_COLOR}"
+                        f"{meal.title} {PRICE_COLOR}({_fmt_price(meal.guest_price)})",
                         end="",
                     )
                 if meal.allergens and (
@@ -540,17 +343,10 @@ def query_mensa(
                     print(f" {ADDITIVE_COLOR}[{additives_str}]", end="")
 
                 print(f"{RESET_COLOR}")
-        if xml_output:
-            xml_root = parser.to_xml(canteen)
-            xml_tree = ET.ElementTree(xml_root)
-            filename = f"{canteen}_{date}_{time.time()}.xml"
-            xml_tree.write(
-                filename, encoding="utf-8", xml_declaration=True, method="xml"
-            )
-            print(f"XML saved to {filename}")
 
 
-def get_parser():
+def get_parser() -> argparse.ArgumentParser:
+    """Construct an argument parser."""
     parser = argparse.ArgumentParser("mensa")
     filter_group = parser.add_mutually_exclusive_group()
     filter_group.add_argument(
@@ -597,7 +393,8 @@ def get_parser():
     parser.add_argument(
         "--show-all-allergens",
         action="store_true",
-        help="Show all allergens. By default, only allergens relevant to vegans (e.g. milk or fish) are shown.",
+        help="Show all allergens. "
+        "By default, only allergens relevant to vegans (e.g. milk or fish) are shown.",
     )
 
     parser.add_argument(
@@ -627,24 +424,32 @@ def get_parser():
     parser.add_argument(
         "--version",
         action="version",
-        version=f"bonn-mensa v{bonn_mensa.version.__version__} (https://github.com/alexanderwallau/bonn-mensa)",
+        version=f"bonn-mensa v{bonn_mensa.version.__version__} "
+        "(https://github.com/alexanderwallau/bonn-mensa)",
     )
 
     parser.add_argument(
         "--xml",
         action="store_true",
-        help="""Save canteen pan with all allergens as xml. If no filename is given the resulting
-            xml will be saved as <canteen name>_<time>.""",
+        help="Save canteen pan with all allergens as xml. "
+        "If no filename is given the resulting "
+        "xml will be saved as <canteen name>_<lang>_<date>_<time>.",
     )
     parser.add_argument(
         "--glutenfree",
         action="store_true",
         help="Only show gluten free options",
     )
+    parser.add_argument(
+        "--indent-xml",
+        action="store_true",
+        help="Indent the generated XML files for better readability.",
+    )
     return parser
 
 
-def run_cmd(args):
+def run_cmd(args: argparse.Namespace) -> None:
+    """Run the meal plan query."""
     if args.vegan:
         filter_mode: Optional[str] = "vegan"
     elif args.vegetarian:
@@ -666,10 +471,12 @@ def run_cmd(args):
         verbose=args.verbose,
         price=args.price,
         xml_output=args.xml,
+        xml_indent=args.indent_xml,
     )
 
 
-def main():
+def main() -> None:
+    """Program entry point."""
     colorama_init()
     args = get_parser().parse_args()
     run_cmd(args)
