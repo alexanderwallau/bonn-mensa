@@ -116,6 +116,13 @@ content_strings = {
     },
 }
 
+# CO2 info is always in German
+co2_strings = {
+    "Mindestens 50% besser als der Durchschnitt.": "CO2_TAG_GREEN",
+    "Besser als der Durchschnitt.": "CO2_TAG_ORANGE",
+    "Schlechter als der Durchschnitt.": "CO2_TAG_RED",
+}
+
 output_strs = {
     "MD_TABLE_COL_CAT": {
         "de": "Kategorie",
@@ -141,6 +148,22 @@ output_strs = {
         "de": "Zusatzstoffe",
         "en": "Additives",
     },
+    "MD_TABLE_COL_CO2": {
+        "de": "CO₂-Bilanz",
+        "en": "CO₂ Balance",
+    },
+    "CO2_TAG_GREEN": {
+        "de": "Mindestens 50% besser als der Durchschnitt",
+        "en": "At least 50% better than average",
+    },
+    "CO2_TAG_ORANGE": {
+        "de": "Besser als der Durchschnitt",
+        "en": "Better than average",
+    },
+    "CO2_TAG_RED": {
+        "de": "Schlechter als der Durchschnitt",
+        "en": "Worse than average",
+    },
 }
 
 
@@ -152,6 +175,7 @@ class Meal:
         self.student_price: Optional[int] = None
         self.staff_price: Optional[int] = None
         self.guest_price: Optional[int] = None
+        self.co2_tag: Optional[str] = None
 
     def add_allergen(self, allergen: str) -> None:
         self.allergens.append(allergen)
@@ -247,6 +271,9 @@ class SimpleMensaResponseParser(HTMLParser):
                 self.mode = "NEW_ALLERGENS"
             elif data == content_strings["NEW_INFOS_ADDITIVES"][self.lang]:
                 self.mode = "NEW_ADDITIVES"
+            elif data in co2_strings:
+                self.curr_meal.co2_tag = co2_strings[data]
+                self.mode = "IGNORE"
             else:
                 raise NotImplementedError(f"Mode NEW_INFOS with data {data}")
         elif self.mode == "NEW_ALLERGENS":
@@ -362,6 +389,7 @@ def query_mensa(
     filter_mode: Optional[str] = None,
     show_all_allergens: bool = False,
     show_additives: bool = False,
+    show_co2: bool = False,
     gluten_free: bool = False,
     url: str = "https://www.studierendenwerk-bonn.de/?type=1732731666",
     verbose: bool = False,
@@ -384,6 +412,11 @@ def query_mensa(
         ADDITIVE_COLOR = Fore.YELLOW
         WARN_COLOR = Fore.RED
         RESET_COLOR = Style.RESET_ALL
+        CO2_COLORS = {
+            "CO2_TAG_GREEN": Fore.GREEN,
+            "CO2_TAG_ORANGE": Fore.YELLOW,
+            "CO2_TAG_RED": Fore.RED,
+        }
     else:
         QUERY_COLOR = ""
         CATEGORY_COLOR = ""
@@ -393,6 +426,11 @@ def query_mensa(
         ADDITIVE_COLOR = ""
         WARN_COLOR = ""
         RESET_COLOR = ""
+        CO2_COLORS = {
+            "CO2_TAG_GREEN": "",
+            "CO2_TAG_ORANGE": "",
+            "CO2_TAG_RED": "",
+        }
 
     filter_str = f" [{filter_mode}]" if filter_mode else ""
     if markdown_output:
@@ -460,12 +498,15 @@ def query_mensa(
             print(f"| {output_strs['MD_TABLE_COL_SOME_ALLERGENS'][language]}", end="")
         if show_additives:
             print(f"| {output_strs['MD_TABLE_COL_ADDITIVES'][language]}", end="")
-        print("|")
+        if show_co2:
+            print(f"| {output_strs['MD_TABLE_COL_CO2'][language]}", end="")
+        print(" |")
         print(f"| :-- | :-- | --: | :-- | ", end="")
         if show_additives:
-            print(":-- |")
-        else:
-            print()
+            print(":-- |", end="")
+        if show_co2:
+            print(":-- |", end="")
+        print()
 
     for cat in queried_categories:
         filtered_meals = [
@@ -499,6 +540,10 @@ def query_mensa(
                 if show_additives:
                     additives_str = ", ".join(meal.additives)
                     print(f" {additives_str} |", end="")
+
+                if show_co2:
+                    co2_str = output_strs[meal.co2_tag][language] if meal.co2_tag else ''
+                    print(f" {co2_str} |", end="")
 
                 print("")
         else:
@@ -538,6 +583,11 @@ def query_mensa(
                 if show_additives and meal.additives:
                     additives_str = ", ".join(meal.additives)
                     print(f" {ADDITIVE_COLOR}[{additives_str}]", end="")
+
+                if show_co2 and meal.co2_tag:
+                    co2_str = output_strs[meal.co2_tag][language]
+                    color = CO2_COLORS[meal.co2_tag]
+                    print(f" {color}[CO₂: {co2_str}]", end="")
 
                 print(f"{RESET_COLOR}")
         if xml_output:
@@ -605,6 +655,13 @@ def get_parser():
         action="store_true",
         help="Show additives.",
     )
+    
+    parser.add_argument(
+        "--show-co2",
+        action="store_true",
+        help="Show CO₂ bilance.",
+    )
+
 
     parser.add_argument(
         "--no-colors",
@@ -660,6 +717,7 @@ def run_cmd(args):
         filter_mode=filter_mode,
         show_all_allergens=args.show_all_allergens,
         show_additives=args.show_additives,
+        show_co2=args.show_co2,
         gluten_free=args.glutenfree,
         colors=not args.no_colors,
         markdown_output=args.markdown,
