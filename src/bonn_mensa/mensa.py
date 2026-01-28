@@ -590,14 +590,15 @@ def query_mensa(
                     print(f" {color}[CO₂: {co2_str}]", end="")
 
                 print(f"{RESET_COLOR}")
-        if xml_output:
-            xml_root = parser.to_xml(canteen)
-            xml_tree = ET.ElementTree(xml_root)
-            filename = f"{canteen}_{date}_{time.time()}.xml"
-            xml_tree.write(
-                filename, encoding="utf-8", xml_declaration=True, method="xml"
-            )
-            print(f"XML saved to {filename}")
+
+    if xml_output:
+        xml_root = parser.to_xml(canteen)
+        xml_tree = ET.ElementTree(xml_root)
+        filename = f"{canteen}_{date}_{time.time()}.xml"
+        xml_tree.write(
+            filename, encoding="utf-8", xml_declaration=True, method="xml"
+        )
+        print(f"XML saved to {filename}")
 
 
 def get_parser():
