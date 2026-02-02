@@ -90,6 +90,19 @@ canteen_id_dict = {
     "Rabinstraße": "21",
 }
 
+canteen_id_dict_pdf = {
+    "SanktAugustin": "1",
+    "CAMPO": "2",
+    "Hofgarten": "3",
+    "FoodtruckRheinbach": "5",
+    "VenusbergBistro": "6",
+    "CasinoZEF/ZEI": "9",
+    "Foodtruck": "10",
+    "Rheinbach": "14",
+    # Rabinstraße apparently does not have a weekly pdf plan
+    # "Rabinstraße": "21",
+}
+
 language_id_dict = {
     "de": "0",
     "en": "1",
@@ -282,11 +295,11 @@ class SimpleMensaResponseParser(HTMLParser):
             else:
                 raise NotImplementedError(f"Mode NEW_INFOS with data {data}")
         elif self.mode == "CO2_EMISSION":
-                match = re.match(r"^(\d+)g CO$", data)
-                if match:
-                    self.curr_meal.co2_emission = int(match.group(1))
-                else:
-                    raise NotImplementedError(f"Mode CO2_EMISSION with data {data}")
+            match = re.match(r"^(\d+)g CO$", data)
+            if match:
+                self.curr_meal.co2_emission = int(match.group(1))
+            else:
+                raise NotImplementedError(f"Mode CO2_EMISSION with data {data}")
         elif self.mode == "NEW_ALLERGENS":
             if self.verbose:
                 print(f"\t\tAdding new allergen: {data}")
@@ -371,6 +384,30 @@ class SimpleMensaResponseParser(HTMLParser):
 
         return root
 
+    def to_pdf(self, wCanteen, language) -> None:
+
+        root_url = "http://www.maxmanager.de/daten-extern/sw-bonn/pdf/wochenplaene/"
+        plan_language = ""
+        if language == "de":
+            plan_language = "de"
+        else:
+            plan_language = en
+        pdf_url = (
+            f"{root_url}{canteen_id_dict_pdf[wCanteen]}/aktuell_{plan_language}.pdf"
+        )
+        response = requests.get(pdf_url)
+
+        if response.status_code == 200:
+            # Get Calenderweek for the plan
+            cw = datetime.datetime.today().isocalendar()[1]
+            filename = f"{wCanteen}_KW_{cw}_weekplan.pdf"
+
+            with open(filename, "wb") as pdf_file:
+                pdf_file.write(response.content)
+            print(f"PDF saved to {filename}")
+        else:
+            print(f"Failed to download PDF. HTTP Status Code: {response.status_code}")
+
     def close(self):
         super().close()
         self.start_new_category()
@@ -408,6 +445,7 @@ def query_mensa(
     colors: bool = True,
     markdown_output: bool = False,
     xml_output: bool = False,
+    pdf: bool = False,
 ) -> None:
     if date is None:
         # If no date is provided get next valid day i.E. working days from monday to fridy
@@ -553,7 +591,7 @@ def query_mensa(
                     print(f" {additives_str} |", end="")
 
                 if show_co2:
-                    co2_str = f"{meal.co2_emission}g" if meal.co2_emission else ''
+                    co2_str = f"{meal.co2_emission}g" if meal.co2_emission else ""
                     print(f" {co2_str} |", end="")
 
                 print("")
@@ -605,10 +643,11 @@ def query_mensa(
         xml_root = parser.to_xml(canteen)
         xml_tree = ET.ElementTree(xml_root)
         filename = f"{canteen}_{date}_{time.time()}.xml"
-        xml_tree.write(
-            filename, encoding="utf-8", xml_declaration=True, method="xml"
-        )
+        xml_tree.write(filename, encoding="utf-8", xml_declaration=True, method="xml")
         print(f"XML saved to {filename}")
+    if pdf:
+
+        parser.to_pdf(canteen, language)
 
 
 def get_parser():
@@ -666,13 +705,12 @@ def get_parser():
         action="store_true",
         help="Show additives.",
     )
-    
+
     parser.add_argument(
         "--show-co2",
         action="store_true",
         help="Show CO₂ bilance.",
     )
-
 
     parser.add_argument(
         "--no-colors",
@@ -709,6 +747,12 @@ def get_parser():
         action="store_true",
         help="Only show gluten free options",
     )
+    parser.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Save the current weeks pdf plan in current Directory",
+    )
+
     return parser
 
 
@@ -735,6 +779,7 @@ def run_cmd(args):
         verbose=args.verbose,
         price=args.price,
         xml_output=args.xml,
+        pdf=args.pdf,
     )
 
 
