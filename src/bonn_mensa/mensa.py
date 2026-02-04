@@ -385,17 +385,9 @@ class SimpleMensaResponseParser(HTMLParser):
 
         return root
 
-    def to_pdf(self, wCanteen, language) -> None:
+    def to_pdf(self, wCanteen) -> None:
 
-        root_url = "http://www.maxmanager.de/daten-extern/sw-bonn/pdf/wochenplaene/"
-        plan_language = ""
-        if language == "de":
-            plan_language = "de"
-        else:
-            plan_language = "en"
-        pdf_url = (
-            f"{root_url}{canteen_id_dict_pdf[wCanteen]}/aktuell_{plan_language}.pdf"
-        )
+        pdf_url = f"http://www.maxmanager.de/daten-extern/sw-bonn/pdf/wochenplaene/{canteen_id_dict_pdf[wCanteen]}/aktuell_de.pdf"
         response = requests.get(pdf_url)
 
         if response.status_code == 200:
@@ -648,7 +640,7 @@ def query_mensa(
         print(f"XML saved to {filename}")
     if pdf:
 
-        parser.to_pdf(canteen, language)
+        parser.to_pdf(canteen)
 
 
 def get_parser():
