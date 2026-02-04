@@ -88,6 +88,7 @@ canteen_id_dict = {
     "CasinoZEF/ZEI": "8",
     "Foodtruck": "19",
     "Rabinstraße": "21",
+    "Rheinbach": "22",
 }
 
 canteen_id_dict_pdf = {
