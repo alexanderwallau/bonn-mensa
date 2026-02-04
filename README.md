@@ -76,13 +76,13 @@ usage: mensa [-h] [--vegan | --vegetarian]
              [-- price {Student, Staff, Guest}]
              [--filter-categories [CATEGORY ...]] [--date DATE] [--lang {de,en}] [--show-all-allergens]
              [--show-additives] [--no-colors] [--markdown]
-             [--glutenfree]
+             [--glutenfree] [--pdf]
 
 optional arguments:
   -h, --help            show this help message and exit
   --vegan               Only show vegan options
   --vegetarian          Only show vegetarian options
-  --mensa {SanktAugustin,CAMPO,Hofgarten,FoodtruckRheinbach,VenusbergBistro,CasinoZEF/ZEI,Foodtruck, Rabinstraße}
+  --mensa {SanktAugustin,CAMPO,Hofgarten,FoodtruckRheinbach,VenusbergBistro,CasinoZEF/ZEI,Foodtruck, Rabinstraße, Rheinbach}
                         The canteen to query. Defaults to CAMPO.
   --price {Student, Staff, Guest}
           The price to display on output defaults to Student
@@ -95,5 +95,6 @@ optional arguments:
   --glutenfree          Show only gluten free meals
   --no-colors           Do not use any ANSI colors in the output.
   --markdown            Output in markdown table format.
+  --pdf                 Download the meal plan of the current week for specified canteen as a PDF.
   --verbose             Output Debug Log
 ```
