@@ -391,7 +391,7 @@ class SimpleMensaResponseParser(HTMLParser):
         if language == "de":
             plan_language = "de"
         else:
-            plan_language = en
+            plan_language = "en"
         pdf_url = (
             f"{root_url}{canteen_id_dict_pdf[wCanteen]}/aktuell_{plan_language}.pdf"
         )
