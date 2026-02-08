@@ -5,6 +5,7 @@ import re
 import time
 from typing import Dict, List, Literal, Optional, Set, TypeAlias
 
+import argcomplete
 import requests
 from colorama import Fore, Style, init as colorama_init
 import xml.etree.ElementTree as ET
@@ -778,7 +779,9 @@ def run_cmd(args):
 
 def main():
     colorama_init()
-    args = get_parser().parse_args()
+    parser = get_parser()
+    argcomplete.autocomplete(parser)
+    args = parser.parse_args()
     run_cmd(args)
 
 
