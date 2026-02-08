@@ -17,6 +17,11 @@ class BonnMensa < Formula
   depends_on :macos
   depends_on "python"
 
+  resource "argcomplete" do
+    url "https://files.pythonhosted.org/packages/38/61/0b9ae6399dd4a58d8c1b1dc5a27d6f2808023d0b5dd3104bb99f45a33ff6/argcomplete-3.6.3.tar.gz"
+    sha256 "62e8ed4fd6a45864acc8235409461b72c9a28ee785a2011cc5eb78318786c89c"
+  end
+
   resource "certifi" do
     url "https://files.pythonhosted.org/packages/71/da/e94e26401b62acd6d91df2b52954aceb7f561743aa5ccc32152886c76c96/certifi-2024.2.2.tar.gz"
     sha256 "0569859f95fc761b18b45ef421b1290a0f65f147e92a1e5eb3e635f9a5e4e66f"
@@ -69,6 +74,8 @@ class BonnMensa < Formula
 
   def install
     virtualenv_install_with_resources
+    generate_completions_from_executable(libexec/"bin/register-python-argcomplete", "mensa",
+                                         shell_parameter_format: :arg)
   end
 
   test do

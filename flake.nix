@@ -49,6 +49,8 @@
                 src = self;
 
                 nativeBuildInputs = with python3.pkgs; [
+                  pkgs.installShellFiles
+                  argcomplete
                   setuptools
                 ];
 
@@ -57,6 +59,13 @@
                   holidays
                   requests
                 ];
+
+                postInstall = ''
+                  installShellCompletion --cmd mensa \
+                    --bash <(register-python-argcomplete mensa --shell bash) \
+                    --fish <(register-python-argcomplete mensa --shell fish) \
+                    --zsh <(register-python-argcomplete mensa --shell zsh)
+                '';
 
                 pythonImportsCheck = [ "bonn_mensa" ];
 
