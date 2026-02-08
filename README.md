@@ -24,7 +24,7 @@ To install the application using homebrew, run:
 
 ```bash
 # Add the tap to homebrew
-brew tap --force-auto-update alexanderwallau/bonn-mensa https://github.com/alexanderwallau/bonn-mensa
+brew tap alexanderwallau/bonn-mensa https://github.com/alexanderwallau/bonn-mensa
 
 # Install the application
 brew install bonn-mensa
