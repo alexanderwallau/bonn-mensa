@@ -23,6 +23,7 @@
               buildInputs = [
                 pre-commit
                 (python3.withPackages (p: with p; [
+                  argcomplete
                   black
                   colorama
                   requests
@@ -55,6 +56,7 @@
                 ];
 
                 propagatedBuildInputs = with python3.pkgs; [
+                  argcomplete
                   colorama
                   holidays
                   requests
